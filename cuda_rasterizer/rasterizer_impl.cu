@@ -212,10 +212,12 @@ int CudaRasterizer::Rasterizer::forward(
 	const float* cov3D_precomp,
 	const float* viewmatrix,
 	const float* projmatrix,
+	const float* intrinsics,
 	const float* cam_pos,
 	const float tan_fovx, float tan_fovy,
 	const bool prefiltered,
 	float* out_color,
+	float* out_others,
 	int* radii,
 	bool debug)
 {
@@ -331,6 +333,10 @@ int CudaRasterizer::Rasterizer::forward(
 		imgState.n_contrib,
 		background,
 		out_color), debug)
+	
+	CHECK_CUDA(FORWARD::postprocess(
+		tile_grid, block, width, height,
+		intrinsics, out_color, out_others), debug)
 
 	return num_rendered;
 }

@@ -32,7 +32,7 @@ std::function<char*(size_t N)> resizeFunctional(torch::Tensor& t) {
     return lambda;
 }
 
-std::tuple<int, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
+std::tuple<int, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
 RasterizeGaussiansCUDA(
 	const torch::Tensor& background,
 	const torch::Tensor& means3D,
@@ -44,6 +44,7 @@ RasterizeGaussiansCUDA(
 	const torch::Tensor& cov3D_precomp,
 	const torch::Tensor& viewmatrix,
 	const torch::Tensor& projmatrix,
+	const torch::Tensor& intrinsics,
 	const float tan_fovx, 
 	const float tan_fovy,
     const int image_height,
@@ -66,6 +67,7 @@ RasterizeGaussiansCUDA(
   auto float_opts = means3D.options().dtype(torch::kFloat32);
 
   torch::Tensor out_color = torch::full({NUM_CHANNELS, H, W}, 0.0, float_opts);
+  torch::Tensor out_others = torch::full({1, NUM_CHANNELS, H, W}, 1.0, float_opts);
   torch::Tensor radii = torch::full({P}, 0, means3D.options().dtype(torch::kInt32));
   
   torch::Device device(torch::kCUDA);
@@ -103,15 +105,17 @@ RasterizeGaussiansCUDA(
 		cov3D_precomp.contiguous().data<float>(), 
 		viewmatrix.contiguous().data<float>(), 
 		projmatrix.contiguous().data<float>(),
+		intrinsics.contiguous().data<float>(),
 		campos.contiguous().data<float>(),
 		tan_fovx,
 		tan_fovy,
 		prefiltered,
 		out_color.contiguous().data<float>(),
+		out_others.contiguous().data<float>(),
 		radii.contiguous().data<int>(),
 		debug);
   }
-  return std::make_tuple(rendered, out_color, radii, geomBuffer, binningBuffer, imgBuffer);
+  return std::make_tuple(rendered, out_color, out_others, radii, geomBuffer, binningBuffer, imgBuffer);
 }
 
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>

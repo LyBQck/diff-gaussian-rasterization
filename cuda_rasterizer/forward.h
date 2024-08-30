@@ -60,6 +60,13 @@ namespace FORWARD
 		uint32_t* n_contrib,
 		const float* bg_color,
 		float* out_color);
+
+	void postprocess(
+		const dim3 grid, dim3 block,
+		int W, int H,
+		const float* intrinsics,
+		float* out_color,
+		float* out_others);
 }
 
 

@@ -45,10 +45,12 @@ namespace CudaRasterizer
 			const float* cov3D_precomp,
 			const float* viewmatrix,
 			const float* projmatrix,
+			const float* intrinsics,
 			const float* cam_pos,
 			const float tan_fovx, float tan_fovy,
 			const bool prefiltered,
 			float* out_color,
+			float* out_others,
 			int* radii = nullptr,
 			bool debug = false);
 
