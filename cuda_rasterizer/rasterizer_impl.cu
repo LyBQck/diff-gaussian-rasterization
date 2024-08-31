@@ -233,13 +233,13 @@ int CudaRasterizer::Rasterizer::forward(
 		radii = geomState.internal_radii;
 	}
 
-	dim3 tile_grid((width + BLOCK_X - 1) / BLOCK_X, (height + BLOCK_Y - 1) / BLOCK_Y, 1);
+	dim3 tile_grid(EXPAND_MARGIN_BLOCK((width + BLOCK_X - 1) / BLOCK_X), EXPAND_MARGIN_BLOCK((height + BLOCK_Y - 1) / BLOCK_Y), 1);
 	dim3 block(BLOCK_X, BLOCK_Y, 1);
 
 	// Dynamically resize image-based auxiliary buffers during training
-	size_t img_chunk_size = required<ImageState>(width * height);
+	size_t img_chunk_size = required<ImageState>(EXPAND_MARGIN(width) * EXPAND_MARGIN(height));
 	char* img_chunkptr = imageBuffer(img_chunk_size);
-	ImageState imgState = ImageState::fromChunk(img_chunkptr, width * height);
+	ImageState imgState = ImageState::fromChunk(img_chunkptr, EXPAND_MARGIN(width) * EXPAND_MARGIN(height));
 
 	if (NUM_CHANNELS != 3 && colors_precomp == nullptr)
 	{

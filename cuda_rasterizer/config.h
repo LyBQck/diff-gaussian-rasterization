@@ -16,4 +16,9 @@
 #define BLOCK_X 16
 #define BLOCK_Y 16
 
+#define DISTORT_MARGIN 1
+
+#define SHIFT_POS(x) (x + DISTORT_MARGIN * BLOCK_X)
+#define EXPAND_MARGIN(x) (x + 2 * DISTORT_MARGIN * BLOCK_X)
+#define EXPAND_MARGIN_BLOCK(x) (x + 2 * DISTORT_MARGIN)
 #endif

@@ -272,17 +272,20 @@ renderCUDA(
 	const float* __restrict__ bg_color,
 	float* __restrict__ out_color)
 {
+	// LMX : renderCUDA<NUM_CHANNELS> << <grid, block >> > 
+
 	// Identify current tile and associated min/max pixel range.
 	auto block = cg::this_thread_block();
-	uint32_t horizontal_blocks = (W + BLOCK_X - 1) / BLOCK_X;
+	// Copied from rasterizer_impl.cu, line 236
+	uint32_t horizontal_blocks = EXPAND_MARGIN_BLOCK((W + BLOCK_X - 1) / BLOCK_X);
 	uint2 pix_min = { block.group_index().x * BLOCK_X, block.group_index().y * BLOCK_Y };
-	uint2 pix_max = { min(pix_min.x + BLOCK_X, W), min(pix_min.y + BLOCK_Y , H) };
+	uint2 pix_max = { min(pix_min.x + BLOCK_X, EXPAND_MARGIN(W)), min(pix_min.y + BLOCK_Y , EXPAND_MARGIN(W)) };
 	uint2 pix = { pix_min.x + block.thread_index().x, pix_min.y + block.thread_index().y };
-	uint32_t pix_id = W * pix.y + pix.x;
+	uint32_t pix_id = EXPAND_MARGIN(W) * pix.y + pix.x;
 	float2 pixf = { (float)pix.x, (float)pix.y };
 
 	// Check if this thread is associated with a valid pixel or outside.
-	bool inside = pix.x < W&& pix.y < H;
+	bool inside = pix.x < EXPAND_MARGIN(W) && pix.y < EXPAND_MARGIN(H);
 	// Done threads can help with fetching, but don't rasterize
 	bool done = !inside;
 
@@ -369,7 +372,7 @@ renderCUDA(
 		final_T[pix_id] = T;
 		n_contrib[pix_id] = last_contributor;
 		for (int ch = 0; ch < CHANNELS; ch++)
-			out_color[ch * H * W + pix_id] = C[ch] + T * bg_color[ch];
+			out_color[ch * EXPAND_MARGIN(H) * EXPAND_MARGIN(W) + pix_id] = C[ch] + T * bg_color[ch];
 	}
 }
 
@@ -382,16 +385,15 @@ postprocessCUDA(
 	float* __restrict__ out_color,
 	float* __restrict__ out_others)
 {
-	// Identify current tile and associated min/max pixel range.
 	auto block = cg::this_thread_block();
 	uint2 pix_min = { block.group_index().x * BLOCK_X, block.group_index().y * BLOCK_Y };
-	uint2 pix_max = { min(pix_min.x + BLOCK_X, W), min(pix_min.y + BLOCK_Y , H) };
+	uint2 pix_max = { min(pix_min.x + BLOCK_X, EXPAND_MARGIN(W)), min(pix_min.y + BLOCK_Y , EXPAND_MARGIN(W)) };
 	uint2 pix = { pix_min.x + block.thread_index().x, pix_min.y + block.thread_index().y };
-	uint32_t pix_id = W * pix.y + pix.x;
+	uint32_t pix_id = EXPAND_MARGIN(W) * pix.y + pix.x;
 	float2 pixf = { (float)pix.x, (float)pix.y };
 
 	// Check if this thread is associated with a valid pixel or outside.
-	bool inside = pix.x < W&& pix.y < H;
+	bool inside = pix.x < EXPAND_MARGIN(W) && pix.y < EXPAND_MARGIN(H);
 	
 	// Load intrinsics
 	float fx = intrinsics[0];
@@ -403,7 +405,9 @@ postprocessCUDA(
 	float p1 = intrinsics[6];
 	float p2 = intrinsics[7];
 	float k3 = intrinsics[8];
-
+	
+	cx = SHIFT_POS(cx);
+	cy = SHIFT_POS(cy);
 	if (inside)
 	{
 		float x = (pixf.x - cx) / fx;
@@ -421,10 +425,10 @@ postprocessCUDA(
 		// Back to absolute coordinates.
 		xDistort = xDistort * fx + cx;
 		yDistort = yDistort * fy + cy;
-		uint32_t pix_id_distort = W * (int)yDistort + (int)xDistort;
+		uint32_t pix_id_distort = EXPAND_MARGIN(W) * (int)yDistort + (int)xDistort;
 
 		for (int ch = 0; ch < CHANNELS; ch++){
-			atomicAdd(out_others + ch * H * W + pix_id_distort, out_color[ch * H * W + pix_id] - out_others[ch * H * W + pix_id_distort]);
+			atomicAdd(out_others + ch * EXPAND_MARGIN(H) * EXPAND_MARGIN(W) + pix_id_distort, out_color[ch * EXPAND_MARGIN(H) * EXPAND_MARGIN(W) + pix_id] - out_others[ch * EXPAND_MARGIN(H) * EXPAND_MARGIN(W) + pix_id_distort]);
 		}
 	}
 }

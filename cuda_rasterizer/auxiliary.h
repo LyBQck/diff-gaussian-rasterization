@@ -40,7 +40,9 @@ __device__ const float SH_C3[] = {
 
 __forceinline__ __device__ float ndc2Pix(float v, int S)
 {
-	return ((v + 1.0) * S - 1.0) * 0.5;
+	// return ((v + 1.0) * S - 1.0) * 0.5;
+	assert(BLOCK_X == BLOCK_Y);
+	return SHIFT_POS(((v + 1.0) * S - 1.0) * 0.5);
 }
 
 __forceinline__ __device__ void getRect(const float2 p, int max_radius, uint2& rect_min, uint2& rect_max, dim3 grid)
@@ -54,6 +56,17 @@ __forceinline__ __device__ void getRect(const float2 p, int max_radius, uint2& r
 		min(grid.y, max((int)0, (int)((p.y + max_radius + BLOCK_Y - 1) / BLOCK_Y)))
 	};
 }
+// __forceinline__ __device__ void getRect(const float2 p, int max_radius, uint2& rect_min, uint2& rect_max, dim3 grid)
+// {
+// 	rect_min = {
+// 		min(grid.x + DISTORT_MARGIN, max((int)(0 - DISTORT_MARGIN), (int)((p.x - max_radius) / BLOCK_X))) + DISTORT_MARGIN,
+// 		min(grid.y + DISTORT_MARGIN, max((int)(0 - DISTORT_MARGIN), (int)((p.y - max_radius) / BLOCK_Y))) + DISTORT_MARGIN
+// 	};
+// 	rect_max = {
+// 		min(grid.x + DISTORT_MARGIN, max((int)(0 - DISTORT_MARGIN), (int)((p.x + max_radius + BLOCK_X - 1) / BLOCK_X))) + DISTORT_MARGIN,
+// 		min(grid.y + DISTORT_MARGIN, max((int)(0 - DISTORT_MARGIN), (int)((p.y + max_radius + BLOCK_Y - 1) / BLOCK_Y))) + DISTORT_MARGIN
+// 	};
+// }
 
 __forceinline__ __device__ float3 transformPoint4x3(const float3& p, const float* matrix)
 {
