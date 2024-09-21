@@ -379,7 +379,7 @@ renderCUDA(
 // Postprocessing method for finalizing the output frame.
 template<uint32_t CHANNELS>
 __global__ void __launch_bounds__(BLOCK_X * BLOCK_Y)
-postprocessCUDA(
+distortCUDA(
 	int W, int H,
 	const float* __restrict__ intrinsics,
 	float* __restrict__ out_color,
@@ -426,9 +426,32 @@ postprocessCUDA(
 		xDistort = xDistort * fx + cx;
 		yDistort = yDistort * fy + cy;
 		uint32_t pix_id_distort = EXPAND_MARGIN(W) * (int)yDistort + (int)xDistort;
+		
+		out_others[INDEX_OFFSET * CHANNELS * EXPAND_MARGIN(H) * EXPAND_MARGIN(W) + pix_id_distort] = (float)pix_id;
+	}
+}
 
+template<uint32_t CHANNELS>
+__global__ void __launch_bounds__(BLOCK_X * BLOCK_Y)
+writeResultsCUDA(
+	int W, int H,
+	float* __restrict__ out_color,
+	float* __restrict__ out_others)
+{
+	auto block = cg::this_thread_block();
+	uint2 pix_min = { block.group_index().x * BLOCK_X, block.group_index().y * BLOCK_Y };
+	uint2 pix_max = { min(pix_min.x + BLOCK_X, EXPAND_MARGIN(W)), min(pix_min.y + BLOCK_Y , EXPAND_MARGIN(W)) };
+	uint2 pix = { pix_min.x + block.thread_index().x, pix_min.y + block.thread_index().y };
+	uint32_t pix_id = EXPAND_MARGIN(W) * pix.y + pix.x;
+
+	// Check if this thread is associated with a valid pixel or outside.
+	bool inside = pix.x < EXPAND_MARGIN(W) && pix.y < EXPAND_MARGIN(H);
+	
+	if (inside)
+	{
+		uint32_t color_index = (int)out_others[INDEX_OFFSET * CHANNELS * EXPAND_MARGIN(H) * EXPAND_MARGIN(W) + pix_id];
 		for (int ch = 0; ch < CHANNELS; ch++){
-			atomicAdd(out_others + ch * EXPAND_MARGIN(H) * EXPAND_MARGIN(W) + pix_id_distort, out_color[ch * EXPAND_MARGIN(H) * EXPAND_MARGIN(W) + pix_id] - out_others[ch * EXPAND_MARGIN(H) * EXPAND_MARGIN(W) + pix_id_distort]);
+			out_others[ch * EXPAND_MARGIN(H) * EXPAND_MARGIN(W) + pix_id] = out_color[ch * EXPAND_MARGIN(H) * EXPAND_MARGIN(W) + color_index];
 		}
 	}
 }
@@ -440,9 +463,12 @@ void FORWARD::postprocess(
 	float* out_color,
 	float* out_others)
 {
-	postprocessCUDA<NUM_CHANNELS> << <grid, block >> > (
+	distortCUDA<NUM_CHANNELS> << <grid, block >> > (
 		W, H,
 		intrinsics, out_color, out_others);
+	writeResultsCUDA<NUM_CHANNELS> << <grid, block >> > (
+		W, H,
+		out_color, out_others);
 }
 
 void FORWARD::render(
